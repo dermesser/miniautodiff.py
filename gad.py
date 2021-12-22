@@ -1,38 +1,52 @@
+"""
+Copyright (c) 2021 Lewin Bormann
+
+Reverse-mode automatic differentiation algorithm.
+"""
+
 import numpy as np
 
 class Expression:
-    def __init__(self, left, right):
+    def __init__(self, left, right, ade=None):
         self.l = left
         self.r = right
-        print(left, right)
 
         self.eval_l = None
         self.eval_r = None
+
+        self.ade = ade or getattr(left, 'ade', None) or getattr(right, 'ade', None)
     
     def fw(self, v):
         pass
     def bw(self):
         pass
 
+    def _autoconv(self, v):
+        if isinstance(v, Expression):
+            return v
+        elif type(v) in (int, float):
+            return self.ade.const(v)
+        assert False, f'unknown type used in expression: {type(v)}'
+
     def __add__(self, other):
-        return OpPlus(self, other)
+        return OpPlus(self, self._autoconv(other))
     def __sub__(self, other):
-        return OpMinus(self, other)
+        return OpMinus(self, self._autoconv(other))
     def __neg__(self, other):
-        return Num(name=self.name, id=self.id)
+        return OpMinus(self.ade.const(0), self._autoconv(other))
     def __mul__(self, other):
-        return OpMult(self, other)
+        return OpMult(self, self._autoconv(other))
     def __truediv__(self, other):
-        return OpDiv(self, other)
+        return OpDiv(self, self._autoconv(other))
     def __pow__(self, other):
-        return OpPow(self, other)
+        return OpPow(self, self._autoconv(other))
 
 class Num(Expression):
-
-    def __init__(self, i, n):
+    def __init__(self, i, n, ade=None):
         self.i = i
-        self.g = np.zeros(n)
+        self.g = np.zeros((n, 1))
         self.g[i] = 1
+        self.ade = ade
 
     def fw(self, v):
         return v[self.i]
@@ -40,15 +54,16 @@ class Num(Expression):
     def bw(self):
         return self.g
 
-def Const(Expression):
-    def __init__(self, v):
+class Const(Expression):
+    def __init__(self, n, v):
         self.v = v
+        self.n = n
 
     def fw(self, v):
         return self.v
 
     def bw(self):
-        return 0
+        return np.zeros(self.n)[:,None]
 
 class OpPlus(Expression):
     def fw(self, v):
@@ -81,12 +96,11 @@ class OpDiv(Expression):
         return self.eval_l / self.eval_r
 
     def bw(self):
-        gl = self.l.bw()[:,None]
-        gr = self.r.bw()[:,None]
-        g = np.array([1/self.eval_r, -self.eval_l/self.eval_r**2])
+        gl = self.l.bw()
+        gr = self.r.bw()
+        g = np.array([1/self.eval_r, -self.eval_l/self.eval_r**2])[:,None]
         # Jacobian.T x gradient
         J = np.hstack((gl, gr))
-        print(J.shape, g.shape)
         return J @ g
 
 class OpPow(Expression):
@@ -102,7 +116,7 @@ class OpPow(Expression):
         v = np.exp(self.eval_r * np.log(self.eval_l))
         thisgrad = np.array([
             self.eval_r/self.eval_l * v,
-            np.log(self.eval_l) * v])
+            np.log(self.eval_l) * v])[:,None]
         return np.hstack((gl, gr)) @ thisgrad
 
 class UnaryExpression(Expression):
@@ -144,7 +158,10 @@ class ADE:
         self.n = n_variables
 
     def vars(self):
-        return [Num(i, self.n) for i in range(self.n)]
+        return [Num(i, self.n, ade=self) for i in range(self.n)]
+
+    def const(self, v):
+        return Const(self.n, v)
 
     def eval(self, expr, vals):
         v = np.array(vals)
@@ -156,7 +173,7 @@ class ADE:
         value = self.eval(expr, at)
         if type(expr) in [list, np.ndarray]:
             # Calculate jacobian
-            return value, np.vstack([e.bw() for e in expr])
+            return value, np.vstack([e.bw().T for e in expr])
         return value, expr.bw()
 
     def __enter__(self):
@@ -167,10 +184,18 @@ class ADE:
 
 ade = ADE(3)
 [x,y,z] = ade.vars()
+v = np.array([x,y,z])
 
 f = x*y + y/z
-g = sqrt(x**Const(2) + y**Const(2) + z**Const(2))
 
-print(ade.eval(f, [1,2,3]))
+def complex_calculation(x,y,z):
+    a = x + y
+    b = x - z
+    c = a * b
+    for i in range(4):
+        c = c + a*b
+    return c
 
-print(ade.grad([f, g], [1,2,3]))
+print(ade.eval([f], [1,2,3]))
+
+print(ade.grad([complex_calculation(x,y,z)], [1,4,5]))

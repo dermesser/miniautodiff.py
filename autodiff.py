@@ -1,3 +1,9 @@
+"""
+Copyright (c) 2021 Lewin Bormann
+
+Simple backpropagation, stateful, naive approach.
+"""
+
 import numpy as np
 
 class Expression:
