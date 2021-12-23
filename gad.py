@@ -39,8 +39,8 @@ class Expression:
         return OpPlus(self, self._autoconv(other))
     def __sub__(self, other):
         return OpMinus(self, self._autoconv(other))
-    def __neg__(self, other):
-        return OpMinus(self.ade.const(0), self._autoconv(other))
+    def __neg__(self):
+        return OpMinus(self.ade.const(0), self._autoconv(self))
     def __mul__(self, other):
         return OpMult(self, self._autoconv(other))
     def __truediv__(self, other):
@@ -223,11 +223,15 @@ print(ade.grad([f, g], [1,2,3]))
 @gradify
 def complex_calculation(x,y,z):
     a = x + y
-    b = x - z
+    b = z - x
     c = a * b
     for i in range(4):
         c = c + a*b
     return c, a, b, a*b
+
+@gradify
+def pres_calculation(x1, x2, x3):
+    return x1*x2 + exp(x1*x3)*cos(x2)
 
 @gradify
 def complex_calculation2(*x):
@@ -238,11 +242,11 @@ def complex_calculation2(*x):
 # ...or automatically using @gradify
 # Equivalent to (without @gradify): print(ade.grad([complex_calculation(x,y,z)], [1,4,5]))
 before = time.time_ns()
-print(complex_calculation(1,4,5))
+print(pres_calculation(1,4,5))
 after = time.time_ns()
 print((after-before)/1e9)
 
 before = time.time_ns()
-print(complex_calculation2(*list(range(1, 10, 2)))[1].shape)
+print(complex_calculation2(*list(range(1, 100, 2)))[1].shape)
 after = time.time_ns()
 print((after-before)/1e9)
