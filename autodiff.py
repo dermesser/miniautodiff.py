@@ -5,6 +5,7 @@ Simple backpropagation, stateful, naive approach.
 """
 
 import numpy as np
+import time
 
 class Expression:
     def __init__(self, left, right):
@@ -27,7 +28,7 @@ class Expression:
         return Num(name=self.name, id=self.id)
     def __mul__(self, other):
         return OpMult(self, other)
-    def __div__(self, other):
+    def __truediv__(self, other):
         return OpDiv(self, other)
 
 class OpPlus(Expression):
@@ -104,6 +105,35 @@ class Num(Expression):
     def bw(self, grad):
         self.grad += grad
 
+def jacobian(f, at):
+    j = np.zeros((len(f), len(at)))
+    val = np.zeros(len(f))
+    for i, ff in enumerate(f):
+        for v in at:
+            v.grad = 0
+        val[i] = ff.fw()
+        ff.bw(1)
+        grad = np.array([v.grad for v in at])
+        j[i, :] = grad
+
+    return val, j
+
+def gradify(f):
+    c = {}
+    def newf(*newxs):
+        if 'variables' not in c:
+            variables = [Num() for x in newxs]
+            expr = f(*variables)
+            c['variables'] = variables
+            c['expr'] = expr
+        else:
+            variables = c['variables']
+            expr = c['expr']
+        for v, x in zip(variables, newxs):
+            v.set_val(x)
+        return jacobian(expr, variables)
+    return newf
+
 a = Num('a')
 b = Num('b')
 c = Num('c')
@@ -116,17 +146,24 @@ a.set_val(3)
 b.set_val(4)
 c.set_val(5)
 
-def jacobian(f, at):
-    j = np.zeros((len(f), len(at)))
-    
-    for i, ff in enumerate(f):
-        for v in at:
-            v.grad = 0
-        ff.fw()
-        ff.bw(1)
-        grad = np.array([v.grad for v in at])
-        j[i, :] = grad
-
-    return j
-
 print(jacobian(e, [a,b,c]))
+
+@gradify
+def complex_calculation(x,y,z):
+    a = x + y
+    b = x - z
+    c = a * b
+    for i in range(4):
+        c = c + a*b
+    return c, a, b, a*b
+
+
+before = time.time_ns()
+print(complex_calculation(1,4,5))
+after = time.time_ns()
+print((after-before)/1e9)
+
+before = time.time_ns()
+print(complex_calculation(2,8,10))
+after = time.time_ns()
+print((after-before)/1e9)

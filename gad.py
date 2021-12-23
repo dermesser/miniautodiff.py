@@ -1,10 +1,13 @@
 """
 Copyright (c) 2021 Lewin Bormann
 
-Reverse-mode automatic differentiation algorithm.
+Simple automatic differentiation algorithm using "parallel forward mode".
+
+See the end of this file for examples.
 """
 
 import numpy as np
+import time
 
 class Expression:
     def __init__(self, left, right, ade=None):
@@ -153,6 +156,9 @@ def tanh(e):
 def sqrt(e):
     return UnaryExpression(np.sqrt, lambda x: 1/(2*np.sqrt(x)), e)
 
+def log(e):
+    return UnaryExpression(np.log, lambda x: 1/x, e)
+
 class ADE:
     def __init__(self, n_variables):
         self.n = n_variables
@@ -165,16 +171,16 @@ class ADE:
 
     def eval(self, expr, vals):
         v = np.array(vals)
-        if type(expr) in [list, np.ndarray]:
+        if type(expr) in [list, np.ndarray, tuple]:
             return [e.fw(v) for e in expr]
         return expr.fw(v)
 
     def grad(self, expr, at):
         value = self.eval(expr, at)
-        if type(expr) in [list, np.ndarray]:
+        if type(expr) in [list, np.ndarray, tuple]:
             # Calculate jacobian
             return value, np.vstack([e.bw().T for e in expr])
-        return value, expr.bw()
+        return value, expr.bw().T
 
     def __enter__(self):
         return self.vars()
@@ -182,20 +188,51 @@ class ADE:
     def __exit__(self):
         pass
 
+def gradify(f):
+    """Decorate a function in order to automatically obtain its Jacobian.
+
+    The wrapped function will return a tuple (value, jacobian).
+
+    Additionally, the computational graph is cached automatically, accelerating repeated invocations.
+    """
+    c = {}
+    def newf(*xs):
+        if 'ade' not in c:
+            ade = ADE(len(xs))
+            newxs = ade.vars()
+            expr = f(*newxs)
+            c['expr'] = expr
+            c['ade'] = ade
+        return c['ade'].grad(c['expr'], xs)
+    return newf
+
 ade = ADE(3)
 [x,y,z] = ade.vars()
 v = np.array([x,y,z])
 
 f = x*y + y/z
+g = sin(x) + cos(y)
 
+# Either use manually with function components...
+print(ade.grad([f, g], [1,2,3]))
+
+@gradify
 def complex_calculation(x,y,z):
     a = x + y
     b = x - z
     c = a * b
     for i in range(4):
         c = c + a*b
-    return c
+    return c, a, b, a*b
 
-print(ade.eval([f], [1,2,3]))
+# ...or automatically using @gradify
+# Equivalent to (without @gradify): print(ade.grad([complex_calculation(x,y,z)], [1,4,5]))
+before = time.time_ns()
+print(complex_calculation(1,4,5))
+after = time.time_ns()
+print((after-before)/1e9)
 
-print(ade.grad([complex_calculation(x,y,z)], [1,4,5]))
+before = time.time_ns()
+print(complex_calculation(2,8,10))
+after = time.time_ns()
+print((after-before)/1e9)
