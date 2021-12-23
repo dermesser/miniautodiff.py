@@ -3,6 +3,10 @@ Copyright (c) 2021 Lewin Bormann
 
 Simple automatic differentiation algorithm using "parallel forward mode".
 
+First, an expression tree is built (and cached, when using @gradify). When evaluating
+a gradient, the expression tree is recursively evaluated, propagating derivatives
+from the bottom-up using Jacobian-gradient products.
+
 See the end of this file for examples.
 """
 
@@ -225,6 +229,12 @@ def complex_calculation(x,y,z):
         c = c + a*b
     return c, a, b, a*b
 
+@gradify
+def complex_calculation2(*x):
+    y = np.array([x[i]+x[i+1]**2 for i in range(len(x)-1)])
+    z = np.array([sqrt(log(e)) for e in y])
+    return z
+
 # ...or automatically using @gradify
 # Equivalent to (without @gradify): print(ade.grad([complex_calculation(x,y,z)], [1,4,5]))
 before = time.time_ns()
@@ -233,6 +243,6 @@ after = time.time_ns()
 print((after-before)/1e9)
 
 before = time.time_ns()
-print(complex_calculation(2,8,10))
+print(complex_calculation2(*list(range(1, 10, 2)))[1].shape)
 after = time.time_ns()
 print((after-before)/1e9)

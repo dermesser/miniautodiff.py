@@ -1,7 +1,14 @@
 """
 Copyright (c) 2021 Lewin Bormann
 
-Simple backpropagation, stateful, naive approach.
+Reverse-mode automatic differentiation algorithm.
+
+First an expression tree is built. When evaluating a gradient, the initial
+seed gradient is propagated backwards through the expression tree. Finally,
+the accumulated chain-rule products are summed at each input variable node
+and read out by the "driver function" (jacobian()).
+
+Simple backpropagation; stateful, naive approach.
 """
 
 import numpy as np
@@ -89,6 +96,12 @@ def sin(e):
 def cos(e):
     return UnaryExpression(np.cos, lambda x: -np.sin(x), e)
 
+def sqrt(e):
+    return UnaryExpression(np.sqrt, lambda x: 1/(2*np.sqrt(x)), e)
+
+def log(e):
+    return UnaryExpression(np.log, lambda x: 1/x, e)
+
 class Num(Expression):
     def __init__(self, name=None, value=None):
         self.name = name
@@ -106,6 +119,7 @@ class Num(Expression):
         self.grad += grad
 
 def jacobian(f, at):
+    """Returns function value and jacobian."""
     j = np.zeros((len(f), len(at)))
     val = np.zeros(len(f))
     for i, ff in enumerate(f):
@@ -157,6 +171,11 @@ def complex_calculation(x,y,z):
         c = c + a*b
     return c, a, b, a*b
 
+@gradify
+def complex_calculation2(*x):
+    y = np.array([x[i]+x[i+1] for i in range(len(x)-1)])
+    z = np.array([sqrt(log(e)) for e in y])
+    return z
 
 before = time.time_ns()
 print(complex_calculation(1,4,5))
@@ -165,5 +184,10 @@ print((after-before)/1e9)
 
 before = time.time_ns()
 print(complex_calculation(2,8,10))
+after = time.time_ns()
+print((after-before)/1e9)
+
+before = time.time_ns()
+print(complex_calculation2(*list(range(1, 100, 2)))[1].shape)
 after = time.time_ns()
 print((after-before)/1e9)
