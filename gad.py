@@ -281,7 +281,10 @@ def complex_calculation2(*x):
     z = np.array([sqrt(log(e)) for e in y])
     return z
 
+#
 # ...or automatically using @gradify
+#
+# Mini benchmarks: print jacobians of gradify'd functions
 # Equivalent to (without @gradify): print(ade.grad([complex_calculation(x,y,z)], [1,4,5]))
 before = time.time_ns()
 print(pres_calculation(1,4,5))
@@ -292,3 +295,11 @@ before = time.time_ns()
 print(complex_calculation2(*list(range(1, 100, 2)))[1].shape)
 after = time.time_ns()
 print((after-before)/1e9)
+
+before = time.time_ns()
+print(complex_calculation(5,6,7)[1].shape)
+after = time.time_ns()
+print((after-before)/1e9)
+
+# Print expression tree
+print([str(e) for e in complex_calculation.orig()(x,y,z)])
