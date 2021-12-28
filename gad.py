@@ -292,14 +292,14 @@ after = time.time_ns()
 print((after-before)/1e9)
 
 before = time.time_ns()
-print(complex_calculation2(*list(range(1, 100, 2)))[1].shape)
-after = time.time_ns()
-print((after-before)/1e9)
-
-before = time.time_ns()
 print(complex_calculation(5,6,7)[1].shape)
 after = time.time_ns()
 print((after-before)/1e9)
 
 # Print expression tree
 print([str(e) for e in complex_calculation.orig()(x,y,z)])
+
+before = time.time_ns()
+print(complex_calculation2(*list(range(1, 400, 2)))[1].shape)
+after = time.time_ns()
+print((after-before)/1e9)

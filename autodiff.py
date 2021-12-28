@@ -213,6 +213,6 @@ after = time.time_ns()
 print((after-before)/1e9)
 
 before = time.time_ns()
-print(complex_calculation2(*list(range(1, 100, 2)))[1].shape)
+print(complex_calculation2(*list(range(1, 400, 2)))[1].shape)
 after = time.time_ns()
 print((after-before)/1e9)
